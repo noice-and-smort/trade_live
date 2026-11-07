@@ -42,7 +42,7 @@ def _browser_candidates() -> list[str]:
   if sys.platform == "darwin":
     apps = ["Google Chrome", "Microsoft Edge", "Brave Browser", "Chromium"]
     roots = ["/Applications", os.path.expanduser("~/Applications")]
-    return [os.path.join(r, f"{a}.app", "Contents", "MacOS", a)
+    return [f"{r}/{a}.app/Contents/MacOS/{a}"
             for r in roots for a in apps]
   return [shutil.which(n) or "" for n in ("google-chrome", "chromium",
                                           "microsoft-edge")]
@@ -120,7 +120,8 @@ def _win_startup_path() -> str:
 
 
 def _mac_agent_path() -> str:
-  return os.path.expanduser(f"~/Library/LaunchAgents/{_MAC_AGENT_ID}.plist")
+  home = os.environ.get("HOME") or os.path.expanduser("~")
+  return os.path.join(home, "Library", "LaunchAgents", f"{_MAC_AGENT_ID}.plist")
 
 
 def autostart_supported() -> bool:
