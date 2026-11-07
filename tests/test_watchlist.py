@@ -328,10 +328,10 @@ def test_two_windows_over_websocket_and_export(home):
             return m
         raise AssertionError(want)
 
-      la = latest(a, keys[0].rsplit("/", 1)[-1][:-5])
-      lb = latest(b, keys[1].rsplit("/", 1)[-1][:-5])
+      la = latest(a, os.path.basename(keys[0])[:-5])
+      lb = latest(b, os.path.basename(keys[1])[:-5])
       assert la["id"] != lb["id"]
     r = c.get("/api/export.xlsx?client=B")
     assert r.status_code == 200
-    assert keys[1].rsplit("/", 1)[-1][:-5].replace(" ", "") in \
+    assert os.path.basename(keys[1])[:-5].replace(" ", "") in \
         r.headers["content-disposition"].replace(" ", "")
