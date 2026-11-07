@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TradeLive</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%2316a34a'/><path d='M3 11l3-4 3 2 4-5' stroke='white' stroke-width='2' fill='none'/></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">TradeLive <span id="status" class="dot" title="Connection"></span></div>
+  <div class="controls">
+    <label>Source
+      <select id="feed"></select>
+    </label>
+    <button id="connectBtn" class="hidden">Connect broker</button>
+    <span id="pickers"></span>
+    <label>Candle
+      <span class="seg" id="tf">
+        <button data-v="1">1m</button><button data-v="3">3m</button><button data-v="5">5m</button>
+      </span>
+    </label>
+    <label>Rows to count
+      <select id="window" title="How many recent rows to count for Net OI flow and highlights">
+        <option value="0">All</option>
+        <option value="5">5</option><option value="10">10</option>
+        <option value="15">15</option><option value="20">20</option>
+        <option value="30">30</option><option value="60">60</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </label>
+    <label title="Highlight the N biggest volumes among the counted rows">Top volumes
+      <select id="topVol">
+        <option value="0">Off</option><option value="1">1</option><option value="3">3</option>
+        <option value="5">5</option><option value="10">10</option>
+      </select>
+    </label>
+    <label class="chk"><input type="checkbox" id="sound"> Sound alerts</label>
+    <label class="chk hidden" id="autostartWrap" title="Open TradeLive automatically when you log in to the computer"><input type="checkbox" id="autostart"> Start automatically</label>
+    <button id="chartBtn">Show chart</button>
+    <a id="exportBtn" class="btn" href="/api/export.xlsx">Download Excel</a>
+    <button id="newWinBtn" title="Open another TradeLive window to watch a different contract side by side">⧉ New window</button>
+    <button id="helpBtn" class="help" title="How to use TradeLive">❓ Help</button>
+  </div>
+</header>
+
+<div id="error" class="error hidden"></div>
+<div id="notice" class="notice hidden"></div>
+
+<section id="watchWrap" class="hidden">
+  <div class="whead">
+    <b>Watchlist</b> <span id="watchCount" class="muted"></span>
+    <label>Sort <select id="watchSort">
+      <option value="added">as added</option><option value="signal">signal (bearish/bullish)</option>
+      <option value="oichg">OI change</option><option value="flow">net OI flow</option>
+      <option value="spike">recent volume spike</option><option value="chg">% change</option>
+    </select></label>
+    <span class="muted">Click a row to open it below.</span>
+    <button id="watchClear" class="wclear" title="Remove every contract from the watchlist and stop background recording">Clear all</button>
+  </div>
+  <table id="watch">
+    <thead><tr><th>Contract</th><th>LTP</th><th>Chg %</th><th>vs VWAP</th><th>PSAR</th>
+      <th>Signal</th><th>OI</th><th title="Total change in Open Interest over the counted rows">OI change</th><th>Net OI flow</th><th>Biggest vol</th><th>Last bar</th><th></th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div id="recentLine" class="recent hidden"></div>
+</section>
+
+<section id="title"><span id="srcBadge" class="badge hidden"></span> <span id="instName">Choose an instrument</span> <span id="lastTs"></span>
+  <button id="pinBtn" class="pin hidden" title="Keep this contract in the watchlist">☆ Add to watchlist</button></section>
+
+<section class="kpis">
+  <div class="kpi" id="kOi" title="Latest Open Interest (column I)">
+    <div class="k">Open Interest</div><div class="v">–</div><div class="s"></div></div>
+  <div class="kpi" id="kOiChg" title="Total change in Open Interest (Σ ΔOI) across the selected rows">
+    <div class="k">OI change</div><div class="v">–</div><div class="s"></div></div>
+  <div class="kpi" id="kFlow" title="OI added on up-bars minus OI added on down-bars over the selected rows (your P2 cell)">
+    <div class="k">Net OI flow</div><div class="v">–</div><div class="s"></div></div>
+  <div class="kpi" id="kVwap" title="Close compared with VWAP (your column L)">
+    <div class="k">Price vs VWAP</div><div class="v">–</div><div class="s"></div></div>
+  <div class="kpi" id="kPsar" title="Parabolic SAR below price = bullish, above = bearish">
+    <div class="k">PSAR</div><div class="v">–</div><div class="s"></div></div>
+  <div class="kpi" id="kSig" title="Latest bar: price direction + OI direction">
+    <div class="k">Latest signal</div><div class="v">–</div><div class="s"></div></div>
+  <div class="kpi" id="kVol" title="Bars since the biggest volume bar in the selected rows (yellow cell)">
+    <div class="k">Biggest volume</div><div class="v">–</div><div class="s"></div></div>
+</section>
+
+<section id="sigStats" class="sigstats hidden" title="Signals over the counted rows: bars, total OI change and volume per signal type">
+  <div class="sbar"><span id="sbBull"></span><span id="sbBear"></span></div>
+  <div class="stiles">
+    <div class="stile LB"><b class="sig LB">LB</b> <span class="sname">Long build-up</span><div class="sv" id="stLB"></div></div>
+    <div class="stile SC"><b class="sig SC">SC</b> <span class="sname">Short covering</span><div class="sv" id="stSC"></div></div>
+    <div class="stile SB"><b class="sig SB">SB</b> <span class="sname">Short build-up</span><div class="sv" id="stSB"></div></div>
+    <div class="stile LU"><b class="sig LU">LU</b> <span class="sname">Long unwinding</span><div class="sv" id="stLU"></div></div>
+  </div>
+</section>
+
+<section id="chartWrap" class="hidden"><div id="chart"></div></section>
+
+<section class="tableWrap">
+  <table id="grid">
+    <thead><tr>
+      <th>Time</th><th>Open</th><th>High</th><th>Low</th><th>Close</th>
+      <th>Volume</th><th>PSAR</th><th>OI</th><th>On Bal Vol</th><th>VWAP</th>
+      <th title="VWAP ÷ Close. Green: price above VWAP">VWAP/Close</th>
+      <th title="Change in On-Balance Volume (signed volume)">ΔOBV</th>
+      <th title="OI change on up-bars. Green = long build-up, red = short covering">OI Δ up-bar</th>
+      <th title="OI change on down-bars. Green = short build-up, red = long unwinding">OI Δ down-bar</th>
+      <th title="Rolling net OI flow over the selected rows">Net flow</th>
+      <th>Signal</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<footer>
+  <span class="legend"><b class="sig LB">LB</b> Long build-up</span>
+  <span class="legend"><b class="sig SC">SC</b> Short covering</span>
+  <span class="legend"><b class="sig SB">SB</b> Short build-up</span>
+  <span class="legend"><b class="sig LU">LU</b> Long unwinding</span>
+  <span class="legend"><i class="sw inwin"></i> rows counted</span>
+  <span class="legend"><i class="sw yellow"></i> biggest volume</span>
+  <span class="legend" id="topVolLegendWrap"><i class="sw amber"></i> <span id="topVolLegend">top 5 volumes (#2–#5)</span></span>
+  <span class="legend" style="margin-left:auto" id="version"></span>
+</footer>
+
+
+<dialog id="helpDlg" class="helpdlg">
+  <div class="helphead"><h2>How to use TradeLive</h2><button id="helpClose" title="Close">✕</button></div>
+  <div class="helpbody">
+
+  <h3>1. Every day</h3>
+  <ul>
+    <li>Switch on the computer. TradeLive opens by itself (if <b>Start automatically</b> is ticked).</li>
+    <li>At <b>8:35</b> Zerodha's login page opens in the browser. <b>Log in there</b> (Zerodha requires this once a day). You are sent back and TradeLive reopens your watchlist and last contract by itself.</li>
+    <li>Missed the 8:35 page? Click <b>Connect broker → Connect</b> any time.</li>
+    <li>Started late or the computer slept? No problem: Zerodha's history includes OI, so the <b>whole day</b> is filled in, including OI.</li>
+  </ul>
+
+  <h3>2. Choosing what to watch</h3>
+  <ul>
+    <li><b>Source</b>: <i>Zerodha (live)</i> for real data, <i>Replay</i> to play a saved Excel file (practice or after hours; <b>▶ Play</b> restarts it).</li>
+    <li><b>Symbol</b>: type an index or F&amp;O stock (NIFTY, BANKNIFTY, RELIANCE…). <b>Expiry</b> and <b>Strike</b> fill in; the strike starts at the one nearest the current price.</li>
+    <li><b>CE / PE / FUT / Cash</b>: call, put, futures, or the share itself. <i>Cash has no OI</i>, so the OI columns and signals stay empty for it.</li>
+    <li>Click <b>Watch</b>. The badge shows <span class="badge live">LIVE</span> or <span class="badge replay">REPLAY</span>. Weekly contracts move to the next expiry automatically after they expire.</li>
+  </ul>
+
+  <h3>3. Watchlist (many contracts at once)</h3>
+  <ul>
+    <li>Click <b>☆ Add to watchlist</b> next to the contract name. Up to 20 contracts appear in the Watchlist at the top and stay live all day.</li>
+    <li>Each row: price, % change, above/below VWAP, PSAR, latest signal (and how many bars in a row), net OI flow, biggest volume.</li>
+    <li><b>Click a row</b> to open its full table below. <b>✕</b> removes it. <b>Sort</b> puts the most active on top. <b>Clear all</b> empties the watchlist.</li>
+    <li>Switching between contracts never loses rows: reopening one reloads the whole day from Zerodha, including OI.</li>
+    <li><b>⧉ New window</b> opens another TradeLive window. Each window can show a <b>different contract</b> (side by side); they share the one Zerodha login, the watchlist and the settings.</li>
+  </ul>
+
+  <h3>4. The cards and the signal summary</h3>
+  <ul>
+    <li><b>Cards</b> (latest bar): Net OI flow, Price vs VWAP, PSAR, Latest signal (and streak), and how long ago the biggest volume was.</li>
+    <li><b>Signal summary</b> (below the cards), over the counted rows: for each of <b class="sig LB">LB</b> <b class="sig SC">SC</b> <b class="sig SB">SB</b> <b class="sig LU">LU</b> the number of bars, the total OI change and the total volume.</li>
+    <li>The bar above it compares <b>price-up bars</b> (LB + SC) with <b>price-down bars</b> (SB + LU) by share of OI moved.</li>
+    <li>Net OI flow = (LB + SC) − (SB + LU) OI change – exactly your P2 cell. Note: in this formula long unwinding adds and short covering subtracts.</li>
+  </ul>
+
+  <h3>5. The table (same as your Excel sheet, newest on top)</h3>
+  <table class="helptbl">
+    <tr><th>Column</th><th>Meaning</th><th>Colours</th></tr>
+    <tr><td>Open / High / Low / Close / Volume</td><td>1-minute candle (or 3/5 min)</td><td><span class="chip y">yellow</span> biggest volume, <span class="chip v2">amber</span> next biggest (small number = rank)</td></tr>
+    <tr><td>PSAR</td><td>Parabolic SAR (0.02, 0.2)</td><td>below price = bullish</td></tr>
+    <tr><td>OI</td><td>Open interest</td><td><span class="chip r">red</span> highest, <span class="chip g">green</span> lowest in the counted rows</td></tr>
+    <tr><td>On Bal Vol</td><td>On-Balance Volume</td><td></td></tr>
+    <tr><td>VWAP</td><td>Volume-weighted average price for the day (from the exchange when available)</td><td></td></tr>
+    <tr><td>VWAP/Close</td><td>VWAP ÷ Close (your column L)</td><td><span class="chip g">green &lt; 1</span> price above VWAP, <span class="chip r">red &gt; 1</span> below</td></tr>
+    <tr><td>ΔOBV</td><td>Change in OBV = volume, + on up bars, − on down bars (column M)</td><td><span class="chip g">+</span> / <span class="chip r">−</span></td></tr>
+    <tr><td>OI Δ up-bar</td><td>OI change on up bars (column N)</td><td><span class="chip g">+</span> long build-up, <span class="chip r">−</span> short covering</td></tr>
+    <tr><td>OI Δ down-bar</td><td>OI change on down bars (column O)</td><td><span class="chip g">+</span> short build-up, <span class="chip r">−</span> long unwinding</td></tr>
+    <tr><td>Net flow</td><td>OI change on up bars minus OI change on down bars over the counted rows (your P2 cell)</td><td><span class="chip g">+</span> / <span class="chip r">−</span></td></tr>
+    <tr><td>Signal</td><td><b class="sig LB">LB</b> Long build-up (price↑ OI↑) · <b class="sig SC">SC</b> Short covering (price↑ OI↓) · <b class="sig SB">SB</b> Short build-up (price↓ OI↑) · <b class="sig LU">LU</b> Long unwinding (price↓ OI↓)</td><td></td></tr>
+  </table>
+  <p>Tinted rows are the ones being counted (see <b>Rows to count</b>).</p>
+
+  <h3>6. Settings in the top bar</h3>
+  <ul>
+    <li><b>Candle</b> 1m / 3m / 5m.</li>
+    <li><b>Rows to count</b>: how many recent rows are used for Net flow, the signal summary and the highlights (All, 5, 10… or Custom).</li>
+    <li><b>Top volumes</b>: how many of the biggest volumes to highlight (Off, 1, 3, 5, 10).</li>
+    <li><b>Sound alerts</b>: a beep when a signal repeats 3 bars in a row or price crosses VWAP (for every watched contract).</li>
+    <li><b>Start automatically</b>: open TradeLive when the computer starts. It always starts the copy you opened last (after an update, open the new one once), never an old or deleted one.</li>
+    <li><b>Show chart</b>: candles, VWAP, PSAR dots, volume and OI.</li>
+    <li><b>Download Excel</b>: your usual sheet with the same formulas and colours, plus the signal summary (columns S–V).</li>
+  </ul>
+
+  <h3>7. Zerodha one-time setup</h3>
+  <ul>
+    <li>On <b>developers.kite.trade</b> create a Kite Connect app (₹500/month, credited back in months with ₹2,000+ brokerage).</li>
+    <li>Set its <b>Redirect URL</b> to exactly <code>http://127.0.0.1:8765/kite/callback</code>.</li>
+    <li>In TradeLive: <b>Source: Zerodha (live)</b> → <b>Connect broker</b> → paste the <b>API key</b> (short) and <b>API secret</b> (long), keep <b>Remember</b> ticked → <b>Connect</b> → log in on Zerodha's page.</li>
+  </ul>
+
+  <h3>8. If something looks wrong</h3>
+  <ul>
+    <li><b>Blue note</b> at the top = information (e.g. market closed, login page opened). <b>Red note</b> = a problem; TradeLive retries by itself.</li>
+    <li><b>“Invalid api_key” on Zerodha's page</b>: the Kite Connect app isn't active/paid yet, or the key was copied wrongly – copy it again from developers.kite.trade.</li>
+    <li><b>After the Zerodha login nothing happens</b>: probably two TradeLive copies are running. Task Manager → end every <b>TradeLive.exe</b>, start TradeLive once, click <b>Connect broker</b> again.</li>
+    <li><b>OI columns empty</b>: normal for <b>Cash</b> (shares have no OI) and before 9:15.</li>
+    <li><b>Screen looks old after an update</b>: close every TradeLive (Task Manager → TradeLive.exe → End task) and start again. The version is shown at the bottom right.</li>
+    <li>For help, send the file <b>tradelive.log</b> (next to TradeLive.exe). Never send passwords, the API secret or codes.</li>
+  </ul>
+  <p class="muted">m.Stock is switched off (its live data service was not working). TradeLive shows data and calculations only; it does not place orders. Trading decisions are your own.</p>
+  </div>
+</dialog>
+
+<dialog id="loginDlg">
+  <form method="dialog" id="loginForm">
+    <h3 id="loginTitle">Connect to broker</h3>
+    <p id="loginHelp" class="muted hidden"></p>
+    <div id="loginFields"></div>
+    <label class="chk2"><input type="checkbox" id="remember" checked> <span id="rememberText">Remember on this computer and log in automatically every morning</span></label>
+    <div id="savedInfo" class="muted hidden"></div>
+    <div id="loginErr" class="error hidden"></div>
+    <menu><button id="forgetBtn" type="button" class="hidden">Forget saved login</button><span style="flex:1"></span><button value="cancel" formnovalidate>Cancel</button><button id="loginGo" value="ok">Connect</button></menu>
+  </form>
+</dialog>
+
+<script src="/static/lightweight-charts.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

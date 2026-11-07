@@ -1,0 +1,15 @@
+settings.json
+settings.json.tmp
+credentials.dat
+credentials.dat.tmp
+.venv/
+.python/
+.pytest_cache/
+.DS_Store
+TradeLive_source.zip
+tradelive.log*
+data/live/
+__pycache__/
+build/
+dist/
+*.spec

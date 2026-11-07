@@ -1,0 +1,52 @@
+# Builds TradeLive.exe on a Windows runner on every push to main.
+# Download TradeLive-windows.zip from the run's "Artifacts" section
+# (or from the "Releases" section of your GitHub repository).
+name: build-windows-exe
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main", "master"]
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pyinstaller pytest
+      - run: python -m pytest -q tests
+      - run: >
+          pyinstaller --noconfirm --onefile --name TradeLive
+          --add-data "tradelive/static;tradelive/static"
+          --hidden-import tradelive.feeds.kite --hidden-import tradelive.feeds.mstock --hidden-import tradelive.diagnose --hidden-import tradelive.housekeeping
+          --collect-submodules uvicorn
+          run.py
+      - name: Assemble release folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release/TradeLive/data | Out-Null
+          Copy-Item dist/TradeLive.exe release/TradeLive/
+          Copy-Item "data/*.xlsx" release/TradeLive/data/
+          Copy-Item README_FOR_USER.md release/TradeLive/README.txt
+          Compress-Archive -Path release/TradeLive -DestinationPath TradeLive-windows.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TradeLive-windows
+          path: release/
+      - name: Publish latest Windows release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "latest"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag TradeLive-windows.zip --title "TradeLive for Windows (Latest)" --notes "Automatic Windows build from commit ${{ github.sha }}"
+          } else {
+            gh release upload $tag TradeLive-windows.zip --clobber
+            gh release edit $tag --notes "Automatic Windows build from commit ${{ github.sha }}"
+          }

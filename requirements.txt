@@ -1,0 +1,6 @@
+# All pure-Python (no compilers / Rust needed on any OS).
+starlette>=0.37
+uvicorn>=0.29
+httpx>=0.27
+websockets>=12
+xlsxwriter>=3.1
